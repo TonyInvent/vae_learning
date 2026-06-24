@@ -486,7 +486,7 @@ ACT solves both problems with a **Conditional VAE (CVAE)** at its core:
 ```
 Observation o ──┬──▶ Encoder q(z|o, a_chunk) ──▶ z ──▶ Decoder ──▶ predicted action chunk
                 │                                                    (k future joint positions)
-Expert action   ──┘
+Expert action ──┘
 chunk a_chunk
 ```
 
