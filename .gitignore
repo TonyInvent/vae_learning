@@ -1,0 +1,13 @@
+# MNIST data (downloaded by demo)
+data/
+
+# Generated sample images
+samples/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
