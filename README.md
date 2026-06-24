@@ -34,7 +34,7 @@ python vae_demo.py
 8. **The Leap to RL** — Why structured latent spaces matter for decision-making
 9. **World Models** — The 867-parameter controller that beat humans at CarRacing
 10. **Dreamer** — How the VAE principle evolved into a universal world model
-11. **Real Robots** — Navigation at 30 lux, terrain locomotion, cross-embodiment transfer
+11. **Real Robots** — ACT (CVAE for bimanual manipulation), navigation at 30 lux, terrain locomotion, cross-embodiment transfer
 12. **What We Haven't Solved** — Open problems and where to go next
 
 ## License

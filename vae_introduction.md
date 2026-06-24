@@ -471,6 +471,45 @@ DreamerV3's actor and critic are trained *entirely* from imagined latent rollout
 
 The VAE → World Model → Dreamer lineage isn't just benchmark results. It's being deployed on physical robots.
 
+### Imitation Learning with CVAE — ACT (Zhao et al., 2023)
+
+One of the most direct and elegant applications of VAEs in robotics comes from **Action Chunking with Transformers (ACT)**, by Tony Zhao and colleagues at Stanford. The problem: teach a bimanual robot to do fine-grained manipulation — opening a condiment cup, slotting a battery, putting on a shoe — from only ~50 human demonstrations (about 10 minutes of data).
+
+The naive approach is behavioral cloning: train a policy to map observations → actions, then replay. But this fails catastrophically on precise, contact-rich tasks. Why?
+
+**Compounding error.** If your policy makes a 1mm mistake at step 1, step 2 starts from the wrong position, and the error snowballs. After 100 steps, you're nowhere near the demonstrated trajectory. This is especially bad for bimanual tasks where two arms must coordinate.
+
+**Multi-modality.** For the same observation, there are often multiple valid actions — the robot could approach the cup from the left or right, grasp the rim or the side. A deterministic policy that outputs a single action averages over these possibilities, producing a motion that does *none* of them well. This is exactly the same averaging problem that makes standard autoencoder reconstructions blurry.
+
+ACT solves both problems with a **Conditional VAE (CVAE)** at its core:
+
+```
+Observation o ──┬──▶ Encoder q(z|o, a_chunk) ──▶ z ──▶ Decoder ──▶ predicted action chunk
+                │                                                    (k future joint positions)
+Expert action   ──┘
+chunk a_chunk
+```
+
+**The CVAE architecture.** The encoder sees both the current observation *and* the expert's action chunk (a sequence of k future joint positions). It compresses this into a latent code z. The decoder takes the observation and z, and outputs a predicted action chunk. The loss is pure VAE:
+
+$$\mathcal{L} = \underbrace{\|a_{\text{pred}} - a_{\text{chunk}}\|_1}_{\text{Reconstruction}} + \beta \cdot \underbrace{D_{KL}\big(q(z|o, a) \| \mathcal{N}(0, I)\big)}_{\text{KL Regularization}}$$
+
+with β = 10.0 — strong regularization, prioritizing latent structure over perfect reconstruction.
+
+**Why action chunking works.** Instead of predicting one action at a time, ACT predicts a *chunk* of k future actions (k=100 in the paper). This reduces the effective horizon by a factor of 100, directly attacking compounding error. And because the predictions from consecutive timesteps overlap, they're averaged together — **temporal ensembling** — producing smoother, more stable motion than any single-step prediction could.
+
+**Why CVAE works for multi-modality.** The encoder learns that z should capture *which* valid strategy the demonstrator used — approach-left vs. approach-right, grasp-rim vs. grasp-side. At inference time, you sample z ~ N(0, I) (or simply set z=0, which works surprisingly well), and the decoder produces one coherent strategy. The KL regularization ensures z-space is compact and sampleable — exactly the property we've been building toward since Part 2.
+
+**The results.** After training on ~50 demonstrations (~10 minutes of human teleoperation), ACT achieved 80–90% success on six challenging bimanual tasks: opening a translucent condiment cup with a snap-on lid, slotting a battery into a charger, picking up a bag of candy with dynamic grasping. All with a single RTX 2080 Ti and a low-cost (<$20k) hardware setup called ALOHA.
+
+**The VAE connection.** ACT is a CVAE where:
+- The "image" is an action chunk (a sequence of joint positions)
+- The "reconstruction" is L1 action prediction error
+- The "sampleability" of z enables generating diverse but coherent manipulation strategies
+- The KL regularization prevents the latent space from fragmenting — different strategies for the same task map to nearby z values
+
+It's the same VAE principle we started with in Part 3 — learn a distribution, not a point — applied not to images, but to robot actions.
+
 ### Navigation in the Dark (VAE + DDPG, 2025)
 
 Indoor robots rely on depth cameras. But in low light (~30 lux — twilight conditions), depth sensors become noisy. Standard RL policies trained on clean depth fail.
