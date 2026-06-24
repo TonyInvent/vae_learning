@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The VAE Story: From Pixels to Robot Policies</title>
+
+<!-- Markdown rendering -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<!-- Math rendering -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<!-- Code highlighting -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+
+<style>
+  :root {
+    --text: #24292e;
+    --bg: #ffffff;
+    --code-bg: #f6f8fa;
+    --border: #e1e4e8;
+    --link: #0366d6;
+    --muted: #6a737d;
+    --width: 800px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 17px; line-height: 1.7; color: var(--text); background: var(--bg);
+  }
+  article { max-width: var(--width); margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* Headings */
+  h1 { font-size: 2.2em; border-bottom: 1px solid var(--border); padding-bottom: .3em; margin: 48px 0 16px; }
+  h2 { font-size: 1.6em; border-bottom: 1px solid var(--border); padding-bottom: .25em; margin: 40px 0 12px; }
+  h3 { font-size: 1.25em; margin: 32px 0 10px; }
+  h4 { font-size: 1.05em; margin: 24px 0 8px; }
+
+  /* Paragraphs, lists, blockquotes */
+  p { margin: 0 0 16px; }
+  ul, ol { padding-left: 2em; margin: 0 0 16px; }
+  li { margin: 4px 0; }
+  li > ul, li > ol { margin-bottom: 0; }
+  blockquote {
+    border-left: 4px solid var(--link); color: var(--muted);
+    padding: 0 16px; margin: 0 0 16px;
+  }
+  blockquote p:last-child { margin-bottom: 0; }
+
+  /* Links */
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Inline code */
+  code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+         font-size: 0.9em; background: var(--code-bg); padding: 2px 6px; border-radius: 3px; }
+  pre code { background: none; padding: 0; }
+
+  /* Code blocks */
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 16px; overflow-x: auto; margin: 0 0 16px; line-height: 1.45;
+  }
+
+  /* Tables */
+  table { border-collapse: collapse; width: 100%; margin: 0 0 16px; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+  th { background: var(--code-bg); font-weight: 600; }
+
+  /* Horizontal rules */
+  hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
+
+  /* Strong / emphasis */
+  strong { font-weight: 600; }
+
+  /* KaTeX math display */
+  .katex-display { margin: 16px 0; overflow-x: auto; overflow-y: hidden; }
+
+  /* Loading / error */
+  #loading { text-align: center; padding: 80px 20px; color: var(--muted); font-size: 1.1em; }
+  #error { text-align: center; padding: 80px 20px; color: #cb2431; display: none; }
+
+  /* Top nav */
+  nav {
+    max-width: var(--width); margin: 0 auto; padding: 16px 24px 0;
+    font-size: 0.9em; color: var(--muted);
+  }
+  nav a { color: var(--muted); }
+  nav span { margin: 0 8px; }
+
+  @media (max-width: 850px) {
+    body { font-size: 16px; }
+    article { padding: 24px 16px 60px; }
+    h1 { font-size: 1.7em; }
+    h2 { font-size: 1.35em; }
+    pre { padding: 12px; font-size: 0.85em; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="https://github.com/TonyInvent/vae_learning">GitHub</a>
+  <span>·</span>
+  <a href="vae_introduction.md">Raw Markdown</a>
+</nav>
+
+<article>
+  <div id="loading">Loading the VAE Story…</div>
+  <div id="error">Failed to load the document. Try refreshing, or read the
+    <a href="vae_introduction.md">raw markdown</a> directly.</div>
+  <div id="content"></div>
+</article>
+
+<script>
+(async function () {
+  const content = document.getElementById('content');
+  const loading = document.getElementById('loading');
+  const errorEl = document.getElementById('error');
+
+  try {
+    const resp = await fetch('vae_introduction.md');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    let md = await resp.text();
+
+    // --- Pre-process: protect LaTeX from Markdown parser ---
+    // Collect display math $$...$$ and inline math $...$
+    const mathBlocks = [];
+    // Display math (must be done before inline)
+    md = md.replace(/\$\$([\s\S]*?)\$\$/g, (_, formula) => {
+      mathBlocks.push({ type: 'display', formula: formula.trim() });
+      return `\x00MATH${mathBlocks.length - 1}\x00`;
+    });
+    // Inline math $...$ (but not $$)
+    md = md.replace(/(?<!\$)\$(?!\$)([^\$\n]+?)\$(?!\$)/g, (_, formula) => {
+      mathBlocks.push({ type: 'inline', formula: formula.trim() });
+      return `\x00MATH${mathBlocks.length - 1}\x00`;
+    });
+
+    // --- Render Markdown to HTML ---
+    marked.setOptions({ breaks: false, gfm: true });
+    let html = marked.parse(md);
+
+    // --- Restore and render LaTeX ---
+    html = html.replace(/\x00MATH(\d+)\x00/g, (_, idx) => {
+      const { type, formula } = mathBlocks[parseInt(idx)];
+      try {
+        return katex.renderToString(formula, {
+          displayMode: type === 'display',
+          throwOnError: false,
+          trust: true,
+        });
+      } catch (e) {
+        return `<code>${formula}</code>`;
+      }
+    });
+
+    // --- Insert into page ---
+    content.innerHTML = html;
+    loading.style.display = 'none';
+
+    // --- Highlight code blocks ---
+    document.querySelectorAll('pre code').forEach(block => {
+      hljs.highlightElement(block);
+    });
+
+    // --- Render any remaining KaTeX (auto-render fallback) ---
+    renderMathInElement(content, {
+      delimiters: [
+        { left: '$$', right: '$$', display: true },
+        { left: '$', right: '$', display: false },
+      ],
+      throwOnError: false,
+      trust: true,
+    });
+
+  } catch (e) {
+    loading.style.display = 'none';
+    errorEl.style.display = 'block';
+    console.error(e);
+  }
+})();
+</script>
+
+</body>
+</html>
