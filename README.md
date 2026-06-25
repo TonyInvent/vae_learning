@@ -7,6 +7,8 @@ A narrative introduction to Variational Autoencoders and their applications in r
 | File | What it is |
 |------|-----------|
 | `vae_introduction.md` | 12-part narrative tutorial: from "what is a VAE?" to real robot deployments in 2026 |
+| `vae_introduction_zh.md` | Chinese translation of the full tutorial |
+| `index.html` / `index_zh.html` | GitHub Pages rendered versions (English / 中文) |
 | `vae_demo.py` | Train a VAE on MNIST, watch it learn to dream new digits from noise |
 | `CLAUDE.md` | Project guidance for Claude Code |
 
